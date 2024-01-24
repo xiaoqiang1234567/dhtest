@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="1ecb7526-255a-4f57-a4ba-8ce8b022bb66" name="dhtest">
+        <fileTransfer accessType="SFTP" host="10.8.9.216" port="22" sshConfigId="e9cc1c83-f1c3-4d59-ab8b-775c96cd640f" sshConfig="root@10.8.9.216:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
