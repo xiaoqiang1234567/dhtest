@@ -56,6 +56,8 @@ char dhmac_fname[20];
 char rtrmac_fname[20];
 char iface_name[30] = { 0 };
 char ip_str[128];
+char interface_type[10];
+
 u_int8_t dhmac_flag = 0;
 u_int8_t rtrmac_flag = 0;
 u_int8_t strict_mac_flag = 0;

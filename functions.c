@@ -80,6 +80,8 @@ extern u_char iface_mac[ETHER_ADDR_LEN];
 extern char dhmac_fname[20];
 extern char iface_name[30];
 extern char ip_str[128];
+extern char interface_type[10];
+
 extern u_int32_t server_id, option50_ip;
 extern u_int8_t dhcp_release_flag;
 
@@ -801,30 +803,76 @@ void calculateMD5(unsigned char *data, size_t dataLength, unsigned char md5Diges
 
 }
 
+void parse_interface_type(char *input, char *first_substring, char *second_substring, char *interface_type) {
+    char *first_hyphen = strchr(input, '-');
+    char *second_hyphen = strchr(first_hyphen + 1, '-');
+
+    strncpy(first_substring, input, first_hyphen - input);
+    first_substring[first_hyphen - input] = '\0';
+
+    strncpy(second_substring, first_hyphen + 1, second_hyphen - first_hyphen - 1);
+    second_substring[second_hyphen - first_hyphen - 1] = '\0';
+
+    strncpy(interface_type, second_hyphen + 1, strlen(input) - (second_hyphen - input) - 1);
+    interface_type[strlen(input) - (second_hyphen - input) - 1] = '\0';
+}
+
+int is_valid_input(char *input) {
+    // 检查输入字符串是否包含两个连字符
+    int num_hyphens = 0;
+    for (int i = 0; input[i] != '\0'; i++) {
+        if (input[i] == '-') {
+            num_hyphens++;
+        }
+    }
+    if (num_hyphens != 2) {
+        return 0;
+    }
+
+    // 检查连字符的位置是否正确
+    int first_hyphen_index = 0;
+    int second_hyphen_index = 0;
+    for (int i = 0; input[i] != '\0'; i++) {
+        if (input[i] == '-') {
+            if (first_hyphen_index == 0) {
+                first_hyphen_index = i;
+            } else {
+                second_hyphen_index = i;
+                break;
+            }
+        }
+    }
+    if (first_hyphen_index == 0 || second_hyphen_index == 0) {
+        return 0;
+    }
+
+    return 1;
+}
+
 
 int build_option60_vci(){
 
     printf("\n--------------------Option60-----------------------------------\n");
-    printf("账号密码: %s\n", vci_buff);
+    printf("字符串: %s\n", vci_buff);
     char Login[50];
     char Password[50];
 
-    // 找到'@'字符的位置
-    char *at_symbol = strchr((char *)vci_buff, '-');
-
-    if (at_symbol != NULL) {
-        size_t login_length = at_symbol - (char *)vci_buff; // 计算Login的长度
-
-        // 拷贝Login部分
-        strncpy(Login, (char *)vci_buff, login_length);
-        Login[login_length] = '\0'; // 添加字符串结尾
-
-        // 拷贝Password部分
-        strcpy(Password, at_symbol + 1);
+    if (!is_valid_input((char *)vci_buff)) {
+        printf("输入字符串格式不正确 例如：XXX-XXX-\n");
+        return 1;
     }
+    parse_interface_type((char *)vci_buff, Login, Password, interface_type);
 
     printf("Login: %s\n", Login);
     printf("Password: %s\n", Password);
+    if (strcmp(interface_type, "V") == 0) {
+        printf("Interface type: 虚拟网络接口 %s\n", interface_type);
+    } else if (strcmp(interface_type, "S") == 0) {
+        printf("Interface type: 静态网卡接口 %s\n", interface_type);
+    } else {
+        printf("Interface type:  两者都没有 %s\n", interface_type);
+
+    }
 //    const char *Login = "71002723120188836@iptv";
 //    const char *Password = "188836";
     int i;
@@ -1741,43 +1789,88 @@ int  print_set_dhinfo(int pkt_type) {
             fprintf(stdout, "IP地址和子网掩码修改失败\n");
         }
     }
+
      /*指定网卡取流rtsp 需要使用ip rule */
-//     char command[100];
-//    int status;
-//
-//    memset(command, 0, sizeof(command));
-//    sprintf(command, "ip route add default via %s dev %s table %s",Router_gateway, iface_name,iface_name);
-//    status  = system(command);
-//    if (status == -1) {
-//        fprintf(stdout,"ip route add default via  failed.\n");
-//    } else {
-//        fprintf(stdout,"ip route add default via   successfully.\n");
-//    }
-//
-//    memset(command, 0, sizeof(command));
-//    sprintf(command, "ip rule del table %s",iface_name);
-//    status  = system(command);
-//    if (status == -1) {
-//        fprintf(stdout,"ip rule del failed.\n");
-//    } else {
-//        fprintf(stdout,"ip rule del  successfully.\n");
-//    }
-//    memset(command, 0, sizeof(command));
-//    sprintf(command, "ip rule add from %s table %s",IP_from_server,iface_name);
-//    status  = system(command);
-//    if (status == -1) {
-//        fprintf(stdout,"ip rule add failed.\n");
-//    } else {
-//        fprintf(stdout,"ip rule add successfully.\n");
-//    }
-//    memset(command, 0, sizeof(command));
-//    sprintf(command, "ip route flush cache ");
-//    status  = system(command);
-//    if (status == -1) {
-//        fprintf(stdout,"ip route flush cache failed.\n");
-//    } else {
-//        fprintf(stdout,"ip route flush cache successfully.\n");
-//    }
+     char command[100];
+    int status;
+    if (strcmp(interface_type, "V") == 0) {
+        memset(command, 0, sizeof(command));
+        sprintf(command, "ip route add default dev %s table %s", iface_name,iface_name);
+        status  = system(command);
+        if (status == -1) {
+            fprintf(stdout,"ip route add default dev  failed.\n");
+        } else {
+            fprintf(stdout,"ip route add default dev   successfully.\n");
+        }
+
+        memset(command, 0, sizeof(command));
+        sprintf(command, "ip rule del table %s",iface_name);
+        status  = system(command);
+        if (status == -1) {
+            fprintf(stdout,"ip rule del failed.\n");
+        } else {
+            fprintf(stdout,"ip rule del  successfully.\n");
+        }
+
+        memset(command, 0, sizeof(command));
+        sprintf(command, "ip rule add from %s table %s",IP_from_server,iface_name);
+        status  = system(command);
+        if (status == -1) {
+            fprintf(stdout,"ip rule add failed.\n");
+        } else {
+            fprintf(stdout,"ip rule add successfully.\n");
+        }
+
+        memset(command, 0, sizeof(command));
+        sprintf(command, "ip route flush cache ");
+        status  = system(command);
+        if (status == -1) {
+            fprintf(stdout,"ip route flush cache failed.\n");
+        } else {
+            fprintf(stdout,"ip route flush cache successfully.\n");
+        }
+
+        printf("Interface type: 虚拟网络接口 %s\n", interface_type);
+    } else if (strcmp(interface_type, "S") == 0) {
+
+        memset(command, 0, sizeof(command));
+        sprintf(command, "ip route add default via %s dev %s table %s",Router_gateway, iface_name,iface_name);
+        status  = system(command);
+        if (status == -1) {
+            fprintf(stdout,"ip route add default via  failed.\n");
+        } else {
+            fprintf(stdout,"ip route add default via   successfully.\n");
+        }
+
+        memset(command, 0, sizeof(command));
+        sprintf(command, "ip rule del table %s",iface_name);
+        status  = system(command);
+        if (status == -1) {
+            fprintf(stdout,"ip rule del failed.\n");
+        } else {
+            fprintf(stdout,"ip rule del  successfully.\n");
+        }
+        memset(command, 0, sizeof(command));
+        sprintf(command, "ip rule add from %s table %s",IP_from_server,iface_name);
+        status  = system(command);
+        if (status == -1) {
+            fprintf(stdout,"ip rule add failed.\n");
+        } else {
+            fprintf(stdout,"ip rule add successfully.\n");
+        }
+        memset(command, 0, sizeof(command));
+        sprintf(command, "ip route flush cache ");
+        status  = system(command);
+        if (status == -1) {
+            fprintf(stdout,"ip route flush cache failed.\n");
+        } else {
+            fprintf(stdout,"ip route flush cache successfully.\n");
+        }
+        printf("Interface type: 静态网卡接口 %s\n", interface_type);
+    } else {
+        printf("Interface type:  两者都没有 %s\n", interface_type);
+    }
+
 
         return  0;
 }
@@ -2108,7 +2201,7 @@ int log_dhinfo()
 {
 	map_all_layer_ptr(DHCP_MSGACK);
 	FILE *dh_file;
-    char path[50] = "/opt/iptv/dhcp-client/"; // 分配足够的空间来存储连接后的路径
+    char path[50] = "/mnt/data/local/dhcp-client/"; // 分配足够的空间来存储连接后的路径
 
     strcat(path, iface_name); //
 	dh_file = fopen(path, "w");
@@ -2173,7 +2266,7 @@ int get_dhinfo()
 	char mac_tmp[20], acq_ip_tmp[20], serv_id_tmp[20], ip_listen_tmp[10];
 	pid_t dh_pid;
 	int items;
-    char path[50] = "/opt/iptv/dhcp-client/"; // 分配足够的空间来存储连接后的路径
+    char path[50] = "/mnt/data/local/dhcp-client/"; // 分配足够的空间来存储连接后的路径
 
     strcat(path, iface_name); //
 	dh_file = fopen(path, "r");
